@@ -258,6 +258,36 @@ def sqli():
     return render_template('sqli.html')
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-    app.run(debug=True)
+    # Only create tables if running in a development environment
+    if app.config['ENV'] == 'development':
+        with app.app_context():
+            db.create_all()
+
+    # Use a production-ready server for deployment
+    if app.config['ENV'] == 'production':
+        # Install Gunicorn using: pip install gunicorn
+        import os
+        from gunicorn.app.base import BaseApplication
+
+        class GunicornApp(BaseApplication):
+            def __init__(self, app, options=None):
+                self.options = options or {}
+                self.application = app
+                super().__init__()
+
+            def load_config(self):
+                for key, value in self.options.items():
+                    self.cfg.set(key, value)
+
+            def load(self):
+                return self.application
+
+        gunicorn_options = {
+            'bind': '0.0.0.0:5000',
+            'workers': 4  # Adjust based on your needs
+        }
+
+        GunicornApp(app, gunicorn_options).run()
+    else:
+        # Use the built-in development server for other environments
+        app.run(debug=True)
